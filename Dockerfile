@@ -1,26 +1,23 @@
-# --- Base image ---
 FROM python:3.11-slim
 
-# --- System dependencies (for pytgcalls / ffmpeg etc) ---
+# --- Install system deps ---
 RUN apt-get update && apt-get install -y \
     ffmpeg \
-    libavcodec-extra \
-    libavformat-dev \
-    libavdevice-dev \
-    libavutil-dev \
-    libswresample-dev \
-    libswscale-dev \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
-# --- Workdir ---
+# --- Set workdir ---
 WORKDIR /app
 
 # --- Copy files ---
-COPY . .
+COPY requirements.txt .
 
 # --- Install python deps ---
 RUN pip install --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
+# --- Copy source code ---
+COPY . .
+
 # --- Run bot ---
-CMD ["python", "main.py"]
+CMD ["python", "bot.py"]
