@@ -12,7 +12,7 @@ app = Client("musicbot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 pytg = PyTgCalls(app)
 
 
-# === YouTube Downloader (audio only) ===
+# === YouTube Downloade (audio only) ===
 def yt_search(query: str):
     opts = {
         "format": "bestaudio/best",
