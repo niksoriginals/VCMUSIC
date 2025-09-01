@@ -1,0 +1,10 @@
+{
+  "build": {
+    "builder": "Docker"
+  },
+  "deploy": {
+    "startCommand": "python main.py",
+    "healthcheckPath": "/",
+    "restartPolicyType": "ON_FAILURE"
+  }
+}
