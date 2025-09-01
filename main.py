@@ -1,64 +1,74 @@
-import os
+import asyncio
 from pyrogram import Client, filters
 from pytgcalls import PyTgCalls, idle
-from pytgcalls.types.input_stream import AudioPiped
+from pytgcalls.types import AudioPiped
 import yt_dlp
 
-API_ID = int(os.getenv("API_ID"))
-API_HASH = os.getenv("API_HASH")
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+# === CONFIG ===
+API_ID = int("YOUR_API_ID")  # apna api id daal
+API_HASH = "YOUR_API_HASH"   # apna api hash daal
+BOT_TOKEN = "YOUR_BOT_TOKEN" # apna bot token daal
 
-app = Client("musicbot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
-pytg = PyTgCalls(app)
+# Pyrogram client
+app = Client(
+    "music-bot",
+    api_id=API_ID,
+    api_hash=API_HASH,
+    bot_token=BOT_TOKEN
+)
 
+# PyTgCalls client
+call_py = PyTgCalls(app)
 
-# === YouTube Downloade (audio only) ===
-def yt_search(query: str):
+# === DOWNLOAD YT AUDIO ===
+def download_audio(url: str) -> str:
     opts = {
         "format": "bestaudio/best",
-        "noplaylist": True,
+        "outtmpl": "downloads/%(id)s.%(ext)s",
         "quiet": True,
-        "extract_flat": False,
-        "outtmpl": "downloads/%(title)s.%(ext)s",
+        "no_warnings": True,
     }
     with yt_dlp.YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(f"ytsearch:{query}", download=True)["entries"][0]
-        return info["title"], ydl.prepare_filename(info)
+        info = ydl.extract_info(url, download=True)
+        return ydl.prepare_filename(info)
 
+# === HANDLER: /play [url or query] ===
+@app.on_message(filters.command("play") & filters.group)
+async def play(_, message):
+    if len(message.command) < 2:
+        return await message.reply_text("⚠️ Usage: /play [YouTube URL or query]")
 
-# === Start Command ===
-@app.on_message(filters.command("start"))
-async def start(_, m):
-    await m.reply("🎶 Music Bot Online! Use /play <song name>")
+    query = " ".join(message.command[1:])
 
+    # Check if it's a URL or a search query
+    if query.startswith("http://") or query.startswith("https://"):
+        url = query
+    else:
+        # Search on YT
+        with yt_dlp.YoutubeDL({"quiet": True}) as ydl:
+            info = ydl.extract_info(f"ytsearch:{query}", download=False)["entries"][0]
+            url = info["webpage_url"]
 
-# === Play Command ===
-@app.on_message(filters.command("play"))
-async def play(_, m):
-    if len(m.command) < 2:
-        return await m.reply("⚠️ Please give a song name!")
+    await message.reply_text(f"⏳ Downloading audio from: {url}")
+    audio_path = download_audio(url)
 
-    query = " ".join(m.command[1:])
-    await m.reply(f"🔎 Searching `{query}`...")
+    chat_id = message.chat.id
+    try:
+        await call_py.join_group_call(
+            chat_id,
+            AudioPiped(audio_path),
+        )
+        await message.reply_text("🎶 Now playing audio in VC!")
+    except Exception as e:
+        await message.reply_text(f"❌ Error: {e}")
 
-    title, file = yt_search(query)
+# === START ===
+async def main():
+    await app.start()
+    await call_py.start()
+    print("✅ Bot is running...")
+    await idle()
+    await app.stop()
 
-    chat_id = m.chat.id
-    await pytg.join_group_call(chat_id, AudioPiped(file))
-
-    await m.reply(f"▶️ Now Playing: **{title}**")
-
-
-# === Stop Command ===
-@app.on_message(filters.command("stop"))
-async def stop(_, m):
-    chat_id = m.chat.id
-    await pytg.leave_group_call(chat_id)
-    await m.reply("⏹️ Music Stopped!")
-
-
-# === Run ===
-pytg.start()
-app.start()
-print("🚀 Music Bot Started!")
-idle()
+if __name__ == "__main__":
+    asyncio.run(main())
